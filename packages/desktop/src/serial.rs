@@ -46,7 +46,7 @@ impl SerialPortConfig for DesktopSerialPort {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl SerialPort for DesktopSerialPort {
     async fn open(&mut self) -> Result<()> {
         let port = serialport::new(&self.config.port, self.config.baud_rate)
