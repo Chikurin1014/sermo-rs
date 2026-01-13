@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use core::{Error, PortInfo, Result, SerialPort, SerialPortConfig};
+use project_core::{Error, PortInfo, Result, SerialPort, SerialPortConfig};
 use std::sync::{Arc, Mutex};
 
 /// Desktop implementation of SerialPort using the serialport crate

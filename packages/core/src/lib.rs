@@ -6,4 +6,4 @@ pub mod serial;
 pub use data::{DataBuffer, DataPoint};
 pub use error::{Error, Result};
 pub use parser::{Parser, RegexParser};
-pub use serial::{PortInfo, SerialPort};
+pub use serial::{PortInfo, SerialPort, SerialPortConfig};

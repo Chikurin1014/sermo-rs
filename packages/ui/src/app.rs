@@ -1,4 +1,4 @@
-use core::SerialPort;
+use project_core::SerialPort;
 use dioxus::prelude::*;
 use std::marker::PhantomData;
 

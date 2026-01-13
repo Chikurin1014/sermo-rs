@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 dioxus = { workspace = true }
 
-core = { workspace = true }
+project_core = { workspace = true }
 
 [features]
 default = []
