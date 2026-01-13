@@ -9,6 +9,9 @@ dioxus = { workspace = true, features = [] }
 core = { workspace = true }
 ui = { workspace = true }
 
+serialport = "4.5"
+tokio = { version = "1.0", features = ["sync", "macros"] }
+
 [features]
 default = ["desktop"]
 desktop = ["dioxus/desktop"]

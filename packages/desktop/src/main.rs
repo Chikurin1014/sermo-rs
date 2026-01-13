@@ -1,22 +1,22 @@
-use dioxus::prelude::*;
+mod serial;
 
-use ui::Hero;
+use dioxus::prelude::*;
+use ui::App;
+
+pub use serial::DesktopSerialPort;
 
 const MAIN_CSS: Asset = asset!("/assets/main.css");
 
 fn main() {
-    dioxus::launch(App);
+    dioxus::launch(DesktopApp);
 }
 
+#[allow(non_snake_case)]
 #[component]
-fn App() -> Element {
-    // Build cool things ✌️
-
+fn DesktopApp() -> Element {
     rsx! {
-        // Global app resources
         document::Link { rel: "stylesheet", href: MAIN_CSS }
 
-        Hero {}
-
+        App::<DesktopSerialPort> {}
     }
 }

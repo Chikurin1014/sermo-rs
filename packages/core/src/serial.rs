@@ -17,13 +17,35 @@ pub struct PortInfo {
 }
 
 impl PortInfo {
-    pub fn new(port: String, baud_rate: u32) -> Self {
+    pub fn new(port: String, baud_rate: u32, data_bits: u8, stop_bits: u8) -> Self {
         Self {
             port,
             baud_rate,
-            data_bits: 8,
-            stop_bits: 1,
+            data_bits,
+            stop_bits,
         }
+    }
+}
+
+impl SerialPortConfig for PortInfo {
+    fn with_port(mut self, port: String) -> Self {
+        self.port = port;
+        self
+    }
+
+    fn with_baud_rate(mut self, baud_rate: u32) -> Self {
+        self.baud_rate = baud_rate;
+        self
+    }
+
+    fn with_data_bits(mut self, data_bits: u8) -> Self {
+        self.data_bits = data_bits;
+        self
+    }
+
+    fn with_stop_bits(mut self, stop_bits: u8) -> Self {
+        self.stop_bits = stop_bits;
+        self
     }
 }
 
@@ -38,9 +60,23 @@ impl Default for PortInfo {
     }
 }
 
+pub trait SerialPortConfig {
+    /// Set the port name
+    fn with_port(self, port: String) -> Self;
+
+    /// Set the baud rate
+    fn with_baud_rate(self, baud_rate: u32) -> Self;
+
+    /// Set the number of data bits
+    fn with_data_bits(self, data_bits: u8) -> Self;
+
+    /// Set the number of stop bits
+    fn with_stop_bits(self, stop_bits: u8) -> Self;
+}
+
 /// Trait for platform-agnostic serial port communication
 #[async_trait]
-pub trait SerialPort: Send + Sync {
+pub trait SerialPort: Send + Sync + SerialPortConfig {
     /// Open the serial port
     async fn open(&mut self) -> Result<()>;
 
