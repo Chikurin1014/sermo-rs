@@ -1,5 +1,5 @@
-use project_core::SerialPort;
 use dioxus::prelude::*;
+use project_core::SerialPort;
 use std::marker::PhantomData;
 
 use crate::hero::Hero;

@@ -75,8 +75,8 @@ pub trait SerialPortConfig {
 }
 
 /// Trait for platform-agnostic serial port communication
-#[async_trait]
-pub trait SerialPort: Send + Sync + SerialPortConfig {
+#[async_trait(?Send)]
+pub trait SerialPort: SerialPortConfig {
     /// Open the serial port
     async fn open(&mut self) -> Result<()>;
 
