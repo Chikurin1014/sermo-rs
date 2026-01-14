@@ -1,5 +1,12 @@
 use dioxus::prelude::*;
+
 use project_core::Message;
+
+/// Simple renderer for message data. Return an Element so callers can embed it
+/// in `rsx!` expressions without using component props macros.
+pub fn render_data(data: &str) -> Element {
+    rsx!( span { class: "message-data", "{data}" } )
+}
 
 /// Render a terminal view for the given messages. This is a plain function
 /// (not a component) which returns an Element so callers can embed it in
@@ -17,16 +24,21 @@ pub fn render_terminal(
                     let ts_ms = u64::from(m.timestamp());
                     let ts_str = if let Some(f) = format_timestamp { f(ts_ms) } else { format!("{}", ts_ms) };
                     let label = format!("[{}] {}", ts_str, m.direction());
-                    rsx!( li { span { class: "message-label", "{label}" } { super::data_view::render_data(m.text()) } } )
+                    rsx!( li { span { class: "message-label", "{label}" } { crate::helper::render_data(m.text()) } } )
                 })}
             }
         }
     )
 }
 
-#[allow(non_snake_case)]
-#[component]
-pub fn TerminalView() -> Element {
-    // Placeholder skeleton component; real usage should call `render_terminal` from a wrapper.
-    rsx!( div { class: "terminal-view", h4 { "Terminal" } p { "(terminal skeleton)" } } )
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn render_data_handles_empty_and_text() {
+        // Basic compilation-time smoke test: ensure the helper can be called
+        let _ = render_data("");
+        let _ = render_data("hello world");
+    }
 }

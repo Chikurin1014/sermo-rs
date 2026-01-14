@@ -1,9 +1,10 @@
 //! This crate contains all shared UI for the workspace.
 
 mod app;
+mod components;
+mod helper;
 mod hero;
-mod serial;
+mod layout;
 
 pub use app::App;
 pub use hero::Hero;
-pub use serial::{ConnectionBar, PortList, TerminalView};
