@@ -9,7 +9,7 @@ pub struct Message {
     pub timestamp: u64,
     pub direction: Direction,
     /// Message payload as a UTF-8 string (display-friendly)
-    pub data: String,
+    pub text: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

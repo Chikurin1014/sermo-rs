@@ -16,7 +16,7 @@ pub fn render_terminal(
                 {messages.iter().map(|m| {
                     let ts_str = if let Some(f) = format_timestamp { f(m.timestamp) } else { format!("{}", m.timestamp) };
                     let label = format!("[{}] {:?}", ts_str, m.direction);
-                    rsx!( li { span { class: "message-label", "{label}" } { super::data_view::render_data(&m.data) } } )
+                    rsx!( li { span { class: "message-label", "{label}" } { super::data_view::render_data(&m.text) } } )
                 })}
             }
         }

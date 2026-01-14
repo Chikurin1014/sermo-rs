@@ -28,7 +28,7 @@ impl Parser {
     }
 
     pub fn parse(&self, message: &Message) -> Result<Point> {
-        let extraction = extract(&self.pattern_str, &message.data)?;
+        let extraction = extract(&self.pattern_str, &message.text)?;
         let value_expr = Expr::new(&self.value_expr_str).eval(&extraction)?;
         let value: f64 = value_expr.try_into()?;
         let mut point = Point::new(value).with_timestamp(message.timestamp);
@@ -85,7 +85,7 @@ mod tests {
             .parse(&Message {
                 timestamp: 0,
                 direction: Direction::In,
-                data: "Value: 42.5".to_string(),
+                text: "Value: 42.5".to_string(),
             })
             .unwrap();
         assert_eq!(point.value, 42.5);
@@ -99,7 +99,7 @@ mod tests {
             .parse(&Message {
                 timestamp: 0,
                 direction: Direction::In,
-                data: "Temperature: 25.5".to_string(),
+                text: "Temperature: 25.5".to_string(),
             })
             .unwrap();
         assert_eq!(point.value, 25.5);
@@ -113,7 +113,7 @@ mod tests {
             .parse(&Message {
                 timestamp: 0,
                 direction: Direction::In,
-                data: "Humidity=65".to_string(),
+                text: "Humidity=65".to_string(),
             })
             .unwrap();
         assert_eq!(point.value, 65.0);
@@ -126,7 +126,7 @@ mod tests {
         let result = parser.parse(&Message {
             timestamp: 0,
             direction: Direction::In,
-            data: "Humidity: 50%".to_string(),
+            text: "Humidity: 50%".to_string(),
         });
         assert!(result.is_err());
     }
@@ -137,7 +137,7 @@ mod tests {
         let result = parser.parse(&Message {
             timestamp: 0,
             direction: Direction::In,
-            data: "Value: not_a_number".to_string(),
+            text: "Value: not_a_number".to_string(),
         });
         assert!(result.is_err());
     }
