@@ -7,6 +7,103 @@ use web_sys;
 use js_sys::{Date, Function, Reflect, Uint8Array};
 use project_core::{PortConfig, PortInfo, PortType, Result as CoreResult};
 
+// Try to extract `PortInfo` from a `web_sys::SerialPort` using the
+// Web Serial `getInfo()` method when available. This is an async helper
+// because `getInfo()` returns a Promise.
+async fn js_port_to_port_info(port: &web_sys::SerialPort, default_name: String) -> PortInfo {
+    let mut info = PortInfo::new(default_name, PortType::Other("web_serial".to_string()));
+
+    let port_js = JsValue::from(port.clone());
+    // Prefer explicit `name` or `path` if present on the port object — some
+    // browser implementations expose a human-readable label directly.
+    if let Ok(name_val) = Reflect::get(&port_js, &JsValue::from_str("name")) {
+        if let Some(name_str) = name_val.as_string() {
+            info.port = name_str;
+            return info;
+        }
+    }
+    if let Ok(path_val) = Reflect::get(&port_js, &JsValue::from_str("path")) {
+        if let Some(path_str) = path_val.as_string() {
+            info.port = path_str;
+            return info;
+        }
+    }
+
+    if let Ok(get_info_val) = Reflect::get(&port_js, &JsValue::from_str("getInfo")) {
+        if get_info_val.is_function() {
+            let func: Function = get_info_val.unchecked_into();
+            if let Ok(promise_val) = func.call0(&port_js) {
+                if let Ok(promise) = promise_val.dyn_into::<js_sys::Promise>() {
+                    if let Ok(info_js) = JsFuture::from(promise).await {
+                        // Extract USB/metadata fields if present
+                        let vendor = Reflect::get(&info_js, &JsValue::from_str("usbVendorId"))
+                            .ok()
+                            .and_then(|v| v.as_f64().map(|n| n as u16));
+                        let product = Reflect::get(&info_js, &JsValue::from_str("usbProductId"))
+                            .ok()
+                            .and_then(|v| v.as_f64().map(|n| n as u16));
+
+                        let manufacturer =
+                            Reflect::get(&info_js, &JsValue::from_str("manufacturer"))
+                                .ok()
+                                .and_then(|v| v.as_string());
+                        let product_name =
+                            Reflect::get(&info_js, &JsValue::from_str("productName"))
+                                .ok()
+                                .and_then(|v| v.as_string());
+                        let serial_number =
+                            Reflect::get(&info_js, &JsValue::from_str("serialNumber"))
+                                .ok()
+                                .and_then(|v| v.as_string());
+
+                        if vendor.is_some() || product.is_some() {
+                            info.port_type = PortType::Usb {
+                                vendor_id: vendor,
+                                product_id: product,
+                                manufacturer: manufacturer.clone(),
+                                product: product_name.clone(),
+                                serial_number: serial_number.clone(),
+                            };
+                            // If we don't yet have a nicer port name, prefer the
+                            // manufacturer/productName combo as the port label.
+                            if info.port.is_empty() {
+                                if let Some(m) = manufacturer.clone() {
+                                    if let Some(p) = product_name.clone() {
+                                        info.port = format!("{} {}", m, p);
+                                    } else {
+                                        info.port = m;
+                                    }
+                                } else if let Some(p) = product_name.clone() {
+                                    info.port = p;
+                                }
+                            }
+                        }
+
+                        if manufacturer.is_some() || product_name.is_some() {
+                            let desc = match (manufacturer.clone(), product_name.clone()) {
+                                (Some(m), Some(p)) => format!("{} {}", m, p),
+                                (Some(m), None) => m,
+                                (None, Some(p)) => p,
+                                _ => String::new(),
+                            };
+                            if !desc.is_empty() {
+                                // Use description as human-friendly port label and also
+                                // prefer it as the `port` identifier if none was found
+                                info.description = Some(desc.clone());
+                                if info.port.is_empty() {
+                                    info.port = desc;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    info
+}
+
 /// Simple WebSerial that owns an optional `web_sys::SerialPort` instance and
 /// implements the `project_core::SerialPort` trait.
 pub struct WebSerialPort {
@@ -43,9 +140,12 @@ impl WebSerialPort {
             project_core::Error::OpenError("Failed to cast to SerialPort".to_string())
         })?;
 
+        // Try to extract richer `PortInfo` metadata from the selected port.
+        let info = js_port_to_port_info(&port, "Selected Web Serial Port".to_string()).await;
+
         Ok(Self {
             port: Some(port),
-            info: PortInfo::default(),
+            info,
             config: PortConfig::default(),
         })
     }
@@ -303,82 +403,8 @@ impl project_core::SerialPort for WebSerialPort {
                 continue;
             }
 
-            if js_port.dyn_ref::<web_sys::SerialPort>().is_some() {
-                // Default basic info
-                let mut info = PortInfo::new(
-                    format!("Serial Port {}", i),
-                    PortType::Other("web_serial".to_string()),
-                );
-
-                // Try to call `getInfo()` on the SerialPort (if the browser exposes it).
-                // We call the JS function via Reflect to avoid depending on a specific
-                // web-sys binding being present.
-                if let Ok(get_info_val) = Reflect::get(&js_port, &JsValue::from_str("getInfo")) {
-                    if get_info_val.is_function() {
-                        let func: Function = get_info_val.unchecked_into();
-                        match func.call0(&js_port) {
-                            Ok(promise_val) => {
-                                if let Ok(promise) = promise_val.dyn_into::<js_sys::Promise>() {
-                                    match JsFuture::from(promise).await {
-                                        Ok(info_js) => {
-                                            // Try to extract USB vendor/product ids and other fields
-                                            let vendor = Reflect::get(
-                                                &info_js,
-                                                &JsValue::from_str("usbVendorId"),
-                                            )
-                                            .ok()
-                                            .and_then(|v| v.as_f64().map(|n| n as u16));
-                                            let product = Reflect::get(
-                                                &info_js,
-                                                &JsValue::from_str("usbProductId"),
-                                            )
-                                            .ok()
-                                            .and_then(|v| v.as_f64().map(|n| n as u16));
-
-                                            let manufacturer = Reflect::get(
-                                                &info_js,
-                                                &JsValue::from_str("manufacturer"),
-                                            )
-                                            .ok()
-                                            .and_then(|v| v.as_string());
-                                            let product_name = Reflect::get(
-                                                &info_js,
-                                                &JsValue::from_str("productName"),
-                                            )
-                                            .ok()
-                                            .and_then(|v| v.as_string());
-                                            let serial_number = Reflect::get(
-                                                &info_js,
-                                                &JsValue::from_str("serialNumber"),
-                                            )
-                                            .ok()
-                                            .and_then(|v| v.as_string());
-
-                                            if vendor.is_some() || product.is_some() {
-                                                info.port_type = PortType::Usb {
-                                                    vendor_id: vendor,
-                                                    product_id: product,
-                                                    manufacturer: manufacturer.clone(),
-                                                    product: product_name.clone(),
-                                                    serial_number: serial_number.clone(),
-                                                };
-                                            }
-
-                                            info.description = None;
-                                        }
-                                        Err(_) => {
-                                            // ignore failures to obtain info, fallback to Other
-                                        }
-                                    }
-                                }
-                            }
-                            Err(_) => {
-                                // calling getInfo threw; ignore and fall back
-                            }
-                        }
-                    }
-                }
-
+            if let Ok(port_obj) = js_port.dyn_into::<web_sys::SerialPort>() {
+                let info = js_port_to_port_info(&port_obj, format!("Serial Port {}", i)).await;
                 result.push(info);
             }
         }
