@@ -1,13 +1,15 @@
 use project_core::TimeSource;
+use project_core::Timestamp;
 
 pub struct SystemTimeSource;
 
 impl TimeSource for SystemTimeSource {
-    fn now_millis() -> u64 {
+    fn now_millis() -> Timestamp {
         use std::time::{SystemTime, UNIX_EPOCH};
-        SystemTime::now()
+        let ms = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
-            .as_millis() as u64
+            .as_millis() as u64;
+        Timestamp(ms)
     }
 }

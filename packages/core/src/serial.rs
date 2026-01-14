@@ -1,25 +1,64 @@
-use crate::Result;
+use crate::data::Message;
+use crate::error::Result;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-/// Serial port information
+/// Port type information inspired by `serialport::SerialPortType`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum PortType {
+    Usb {
+        vendor_id: Option<u16>,
+        product_id: Option<u16>,
+        manufacturer: Option<String>,
+        product: Option<String>,
+        serial_number: Option<String>,
+    },
+    Bluetooth,
+    Pci,
+    /// Unknown or other port type. The contained String may be a debug
+    /// representation from the platform crate.
+    Other(String),
+}
+
+/// Static information about a physical port returned by `list_ports()`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PortInfo {
     /// Port name (e.g., "COM1", "/dev/ttyUSB0")
     pub port: String,
-    /// Baud rate
-    pub baud_rate: u32,
-    /// Data bits (typically 5-8)
-    pub data_bits: u8,
-    /// Number of stop bits
-    pub stop_bits: u8,
+    /// Port type (USB/Bluetooth/etc)
+    pub port_type: PortType,
+    /// Optional human-friendly description or manufacturer string
+    pub description: Option<String>,
 }
 
 impl PortInfo {
-    pub fn new(port: String, baud_rate: u32, data_bits: u8, stop_bits: u8) -> Self {
+    pub fn new(port: String, port_type: PortType) -> Self {
         Self {
             port,
+            port_type,
+            description: None,
+        }
+    }
+}
+
+impl Default for PortInfo {
+    fn default() -> Self {
+        Self::new(String::new(), PortType::Other(String::new()))
+    }
+}
+
+/// Configuration used to open a port (baud rate, data bits, stop bits, ...)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PortConfig {
+    pub baud_rate: u32,
+    pub data_bits: u8,
+    pub stop_bits: u8,
+}
+
+impl PortConfig {
+    pub fn new(baud_rate: u32, data_bits: u8, stop_bits: u8) -> Self {
+        Self {
             baud_rate,
             data_bits,
             stop_bits,
@@ -27,51 +66,18 @@ impl PortInfo {
     }
 }
 
-impl SerialPortConfig for PortInfo {
-    fn with_port(mut self, port: String) -> Self {
-        self.port = port;
-        self
-    }
-
-    fn with_baud_rate(mut self, baud_rate: u32) -> Self {
-        self.baud_rate = baud_rate;
-        self
-    }
-
-    fn with_data_bits(mut self, data_bits: u8) -> Self {
-        self.data_bits = data_bits;
-        self
-    }
-
-    fn with_stop_bits(mut self, stop_bits: u8) -> Self {
-        self.stop_bits = stop_bits;
-        self
-    }
-}
-
-impl Default for PortInfo {
+impl Default for PortConfig {
     fn default() -> Self {
-        Self {
-            port: String::new(),
-            baud_rate: 9600,
-            data_bits: 8,
-            stop_bits: 1,
-        }
+        Self::new(9600, 8, 1)
     }
 }
 
 pub trait SerialPortConfig {
-    /// Set the port name
+    /// Set the port name (where applicable)
     fn with_port(self, port: String) -> Self;
 
-    /// Set the baud rate
-    fn with_baud_rate(self, baud_rate: u32) -> Self;
-
-    /// Set the number of data bits
-    fn with_data_bits(self, data_bits: u8) -> Self;
-
-    /// Set the number of stop bits
-    fn with_stop_bits(self, stop_bits: u8) -> Self;
+    /// Replace the entire port configuration
+    fn with_config(self, config: PortConfig) -> Self;
 }
 
 /// Trait for platform-agnostic serial port communication
@@ -85,10 +91,19 @@ pub trait SerialPort: Default + SerialPortConfig {
 
     /// Read data from the serial port
     /// Returns the number of bytes read and the data buffer
-    async fn read(&mut self, buf: &mut [u8]) -> Result<usize>;
+    async fn read(&mut self) -> Result<Message>;
 
     /// Write data to the serial port
-    async fn write(&mut self, buf: &[u8]) -> Result<usize>;
+    async fn write(&mut self, message: Message) -> Result<()>;
+
+    /// Flush the serial port buffers
+    async fn flush(&mut self) -> Result<()>;
+
+    /// Port configuration
+    async fn config(&self) -> &PortConfig;
+
+    /// Port info
+    async fn info(&self) -> &PortInfo;
 
     /// Check if the port is open
     fn is_open(&self) -> bool;

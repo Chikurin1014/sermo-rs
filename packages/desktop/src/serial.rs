@@ -1,18 +1,23 @@
 use async_trait::async_trait;
-use project_core::{Error, PortInfo, Result, SerialPort, SerialPortConfig};
+use project_core::{
+    Direction, Error, Message, PortConfig, PortInfo, PortType, Result, SerialPort, SerialPortConfig,
+};
 use std::sync::{Arc, Mutex};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Desktop implementation of SerialPort using the serialport crate
 #[derive(Debug)]
 pub struct DesktopSerialPort {
     port: Arc<Mutex<Option<Box<dyn serialport::SerialPort>>>>,
-    config: PortInfo,
+    info: PortInfo,
+    config: PortConfig,
 }
 
 impl DesktopSerialPort {
-    pub fn new(config: PortInfo) -> Self {
+    pub fn new(info: PortInfo, config: PortConfig) -> Self {
         Self {
             port: Arc::new(Mutex::new(None)),
+            info,
             config,
         }
     }
@@ -20,28 +25,18 @@ impl DesktopSerialPort {
 
 impl Default for DesktopSerialPort {
     fn default() -> Self {
-        Self::new(PortInfo::default())
+        Self::new(PortInfo::default(), PortConfig::default())
     }
 }
 
 impl SerialPortConfig for DesktopSerialPort {
     fn with_port(mut self, port: String) -> Self {
-        self.config = self.config.with_port(port);
+        self.info.port = port;
         self
     }
 
-    fn with_baud_rate(mut self, baud_rate: u32) -> Self {
-        self.config = self.config.with_baud_rate(baud_rate);
-        self
-    }
-
-    fn with_data_bits(mut self, data_bits: u8) -> Self {
-        self.config = self.config.with_data_bits(data_bits);
-        self
-    }
-
-    fn with_stop_bits(mut self, stop_bits: u8) -> Self {
-        self.config = self.config.with_stop_bits(stop_bits);
+    fn with_config(mut self, config: PortConfig) -> Self {
+        self.config = config;
         self
     }
 }
@@ -49,7 +44,7 @@ impl SerialPortConfig for DesktopSerialPort {
 #[async_trait(?Send)]
 impl SerialPort for DesktopSerialPort {
     async fn open(&mut self) -> Result<()> {
-        let port = serialport::new(&self.config.port, self.config.baud_rate)
+        let port = serialport::new(&self.info.port, self.config.baud_rate)
             .data_bits(match self.config.data_bits {
                 5 => serialport::DataBits::Five,
                 6 => serialport::DataBits::Six,
@@ -74,27 +69,63 @@ impl SerialPort for DesktopSerialPort {
         Ok(())
     }
 
-    async fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+    async fn read(&mut self) -> Result<Message> {
         let mut port_lock = self.port.lock().unwrap();
         let port = port_lock
             .as_mut()
             .ok_or_else(|| Error::ReadError("Port not open".to_string()))?;
 
-        port.read(buf).map_err(|e| Error::ReadError(e.to_string()))
+        // Read available bytes into a buffer (non-blocking simple approach)
+        let mut buf = vec![0u8; 1024];
+        let read = port
+            .read(&mut buf)
+            .map_err(|e| Error::ReadError(e.to_string()))?;
+        buf.truncate(read);
+
+        let text = String::from_utf8_lossy(&buf).to_string();
+
+        let ts = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+
+        Ok(Message::new(
+            project_core::data::Timestamp(ts),
+            Direction::In,
+            text,
+        ))
     }
 
-    async fn write(&mut self, buf: &[u8]) -> Result<usize> {
+    async fn write(&mut self, message: Message) -> Result<()> {
         let mut port_lock = self.port.lock().unwrap();
         let port = port_lock
             .as_mut()
             .ok_or_else(|| Error::WriteError("Port not open".to_string()))?;
 
-        port.write(buf)
+        let data = message.text().as_bytes();
+        port.write(data)
+            .map(|_| ())
             .map_err(|e| Error::WriteError(e.to_string()))
+    }
+
+    async fn flush(&mut self) -> Result<()> {
+        let mut port_lock = self.port.lock().unwrap();
+        if let Some(port) = port_lock.as_mut() {
+            port.flush().map_err(|e| Error::WriteError(e.to_string()))?;
+        }
+        Ok(())
     }
 
     fn is_open(&self) -> bool {
         self.port.lock().unwrap().is_some()
+    }
+
+    async fn config(&self) -> &PortConfig {
+        &self.config
+    }
+
+    async fn info(&self) -> &PortInfo {
+        &self.info
     }
 
     async fn list_ports() -> Result<Vec<PortInfo>> {
@@ -103,7 +134,24 @@ impl SerialPort for DesktopSerialPort {
 
         Ok(ports
             .into_iter()
-            .map(|p| PortInfo::new(p.port_name, 9600, 8, 1))
+            .map(|p| {
+                // Map platform port type into our PortType enum when possible.
+                let port_type = match p.port_type {
+                    serialport::SerialPortType::BluetoothPort => PortType::Bluetooth,
+                    serialport::SerialPortType::PciPort => PortType::Pci,
+                    serialport::SerialPortType::UsbPort(_) => {
+                        // We don't attempt to pull out structured USB fields here to
+                        // avoid fragile platform-specific field access; store a
+                        // textual representation for now.
+                        PortType::Other(format!("{:?}", p.port_type))
+                    }
+                    _ => PortType::Other(format!("{:?}", p.port_type)),
+                };
+
+                let mut info = PortInfo::new(p.port_name.clone(), port_type);
+                info.description = None;
+                info
+            })
             .collect())
     }
 }
