@@ -1,9 +1,11 @@
 mod serial;
+mod system;
 
 use dioxus::prelude::*;
 use ui::App;
 
-pub use serial::DesktopSerialPort;
+use serial::DesktopSerialPort;
+use system::SystemTimeSource;
 
 const MAIN_CSS: Asset = asset!("/assets/main.css");
 
@@ -17,6 +19,6 @@ fn DesktopApp() -> Element {
     rsx! {
         document::Link { rel: "stylesheet", href: MAIN_CSS }
 
-        App::<DesktopSerialPort> {}
+        App::<DesktopSerialPort, SystemTimeSource> {}
     }
 }
