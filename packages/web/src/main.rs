@@ -1,11 +1,12 @@
 mod serial;
 mod serialport_manager;
+mod system;
 
 use dioxus::prelude::*;
 use ui::App;
 
-pub use serial::WebSerialPort;
-pub use serialport_manager::SERIAL_PORT_MANAGER;
+use serial::WebSerialPort;
+use system::SystemTimeSource;
 
 const FAVICON: Asset = asset!("/assets/favicon.ico");
 const MAIN_CSS: Asset = asset!("/assets/main.css");
@@ -21,6 +22,6 @@ fn WebApp() -> Element {
         document::Link { rel: "icon", href: FAVICON }
         document::Link { rel: "stylesheet", href: MAIN_CSS }
 
-        App::<WebSerialPort> {}
+        App::<WebSerialPort, SystemTimeSource> {}
     }
 }
