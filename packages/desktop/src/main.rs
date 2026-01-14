@@ -2,6 +2,7 @@ mod serial;
 mod system;
 
 use dioxus::prelude::*;
+
 use ui::App;
 
 use serial::DesktopSerialPort;

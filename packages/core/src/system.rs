@@ -1,3 +1,5 @@
+use crate::data::Timestamp;
+
 /// System utilities and abstractions used across crates.
 ///
 /// This module exposes a `TimeSource` trait. Concrete implementations
@@ -6,5 +8,5 @@
 /// in the core crate.
 pub trait TimeSource {
     /// Return current Unix timestamp in milliseconds.
-    fn now_millis() -> u64;
+    fn now_millis() -> Timestamp;
 }

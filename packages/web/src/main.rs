@@ -1,8 +1,8 @@
 mod serial;
-mod serialport_manager;
 mod system;
 
 use dioxus::prelude::*;
+
 use ui::App;
 
 use serial::WebSerialPort;

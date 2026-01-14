@@ -28,10 +28,10 @@ impl Parser {
     }
 
     pub fn parse(&self, message: &Message) -> Result<Point> {
-        let extraction = extract(&self.pattern_str, &message.text)?;
+        let extraction = extract(&self.pattern_str, message.text())?;
         let value_expr = Expr::new(&self.value_expr_str).eval(&extraction)?;
         let value: f64 = value_expr.try_into()?;
-        let mut point = Point::new(value).with_timestamp(message.timestamp);
+        let mut point = Point::new(message.timestamp(), value);
 
         // If label_expr is provided, evaluate it
         if !self.label_expr_str.is_empty() {
@@ -74,7 +74,7 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
-    use crate::data::Direction;
+    use crate::data::{Direction, Timestamp};
 
     use super::*;
 
@@ -82,63 +82,63 @@ mod tests {
     fn test_regex_parser_simple_numeric() {
         let parser = Parser::new(r"(\d+\.\d+)", "", "$1");
         let point = parser
-            .parse(&Message {
-                timestamp: 0,
-                direction: Direction::In,
-                text: "Value: 42.5".to_string(),
-            })
+            .parse(&Message::new(
+                Timestamp::from_millis(0),
+                Direction::In,
+                "Value: 42.5",
+            ))
             .unwrap();
-        assert_eq!(point.value, 42.5);
-        assert_eq!(point.label, None);
+        assert_eq!(point.value(), 42.5);
+        assert_eq!(point.label(), None);
     }
 
     #[test]
     fn test_regex_parser_with_name() {
         let parser = Parser::new(r"(\w+): (\d+\.\d+)", "$1", "$2");
         let point = parser
-            .parse(&Message {
-                timestamp: 0,
-                direction: Direction::In,
-                text: "Temperature: 25.5".to_string(),
-            })
+            .parse(&Message::new(
+                Timestamp::from_millis(0),
+                Direction::In,
+                "Temperature: 25.5",
+            ))
             .unwrap();
-        assert_eq!(point.value, 25.5);
-        assert_eq!(point.label, Some("Temperature".to_string()));
+        assert_eq!(point.value(), 25.5);
+        assert_eq!(point.label(), Some("Temperature"));
     }
 
     #[test]
     fn test_regex_parser_multiple_captures() {
         let parser = Parser::new(r"(\w+)=(\d+)", "$1", "$2");
         let point = parser
-            .parse(&Message {
-                timestamp: 0,
-                direction: Direction::In,
-                text: "Humidity=65".to_string(),
-            })
+            .parse(&Message::new(
+                Timestamp::from_millis(0),
+                Direction::In,
+                "Humidity=65",
+            ))
             .unwrap();
-        assert_eq!(point.value, 65.0);
-        assert_eq!(point.label, Some("Humidity".to_string()));
+        assert_eq!(point.value(), 65.0);
+        assert_eq!(point.label(), Some("Humidity"));
     }
 
     #[test]
     fn test_regex_parser_no_match() {
         let parser = Parser::new(r"Temperature: (\d+\.\d+)", "", "$1");
-        let result = parser.parse(&Message {
-            timestamp: 0,
-            direction: Direction::In,
-            text: "Humidity: 50%".to_string(),
-        });
+        let result = parser.parse(&Message::new(
+            Timestamp::from_millis(0),
+            Direction::In,
+            "Humidity: 50%",
+        ));
         assert!(result.is_err());
     }
 
     #[test]
     fn test_regex_parser_invalid_number() {
         let parser = Parser::new(r"(\w+)", "", "$1");
-        let result = parser.parse(&Message {
-            timestamp: 0,
-            direction: Direction::In,
-            text: "Value: not_a_number".to_string(),
-        });
+        let result = parser.parse(&Message::new(
+            Timestamp::from_millis(0),
+            Direction::In,
+            "Value: not_a_number",
+        ));
         assert!(result.is_err());
     }
 }
