@@ -4,7 +4,7 @@ use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 use web_sys;
 
-use js_sys::{Function, Reflect};
+use js_sys::{Date, Function, Reflect, Uint8Array};
 use project_core::{PortConfig, PortInfo, PortType, Result as CoreResult};
 
 /// Simple WebSerial that owns an optional `web_sys::SerialPort` instance and
@@ -101,18 +101,166 @@ impl project_core::SerialPort for WebSerialPort {
         Ok(())
     }
     async fn read(&mut self) -> project_core::Result<project_core::Message> {
-        // Reading from web serial requires handling ReadableStream; leave as
-        // not implemented for now and return an error.
-        Err(project_core::Error::ReadError(
-            "Read not implemented for web".to_string(),
+        use wasm_bindgen_futures::JsFuture;
+
+        let port = match &self.port {
+            Some(p) => p,
+            None => return Err(project_core::Error::ReadError("No port open".to_string())),
+        };
+
+        // Use JS reflection to access the readable stream and its reader so
+        // we don't depend on specific web-sys bindings which may vary.
+        let port_js = JsValue::from(port.clone());
+
+        let readable = Reflect::get(&port_js, &JsValue::from_str("readable")).map_err(|_| {
+            project_core::Error::ReadError("Port has no readable stream".to_string())
+        })?;
+        if readable.is_undefined() || readable.is_null() {
+            return Err(project_core::Error::ReadError(
+                "Readable stream not available".to_string(),
+            ));
+        }
+
+        // getReader()
+        // let get_reader = match Reflect::get(&readable, &JsValue::from_str("getReader")) {
+        //     Ok(v) => v,
+        //     Err(_) => match Reflect::get(&readable, &JsValue::from_str("get_reader")) {
+        //         Ok(v2) => v2,
+        //         Err(_) => {
+        //             return Err(project_core::Error::ReadError(
+        //                 "Readable.getReader not available".to_string(),
+        //             ))
+        //         }
+        //     },
+        // };
+        let get_reader = Reflect::get(&readable, &JsValue::from_str("getReader"))
+            .or(Reflect::get(&readable, &JsValue::from_str("get_reader")))
+            .map_err(|_| {
+                project_core::Error::ReadError("Readable.getReader not available".to_string())
+            })?;
+        if !get_reader.is_function() {
+            return Err(project_core::Error::ReadError(
+                "Readable.getReader not available".to_string(),
+            ));
+        }
+        let get_reader_fn: Function = get_reader.unchecked_into();
+
+        let reader = get_reader_fn
+            .call0(&readable)
+            .map_err(|_| project_core::Error::ReadError("Failed to get reader".to_string()))?;
+
+        // call reader.read() -> Promise
+        let read_fn = Reflect::get(&reader, &JsValue::from_str("read"))
+            .map_err(|_| project_core::Error::ReadError("Reader.read not available".to_string()))?;
+        if !read_fn.is_function() {
+            return Err(project_core::Error::ReadError(
+                "Reader.read not a function".to_string(),
+            ));
+        }
+        let read_fn: Function = read_fn.unchecked_into();
+
+        let promise = read_fn
+            .call0(&reader)
+            .map_err(|_| project_core::Error::ReadError("Failed to call reader.read".to_string()))?
+            .dyn_into::<js_sys::Promise>()
+            .map_err(|_| {
+                project_core::Error::ReadError("reader.read did not return a Promise".to_string())
+            })?;
+        let result = JsFuture::from(promise).await.map_err(|_| {
+            project_core::Error::ReadError("reader.read promise failed".to_string())
+        })?;
+
+        // result.value is the Uint8Array (or undefined)
+        let value = Reflect::get(&result, &JsValue::from_str("value")).unwrap_or(JsValue::NULL);
+        if value.is_null() || value.is_undefined() {
+            return Err(project_core::Error::ReadError(
+                "No data available".to_string(),
+            ));
+        }
+
+        let u8 = Uint8Array::new(&value);
+        let mut vec = vec![0u8; u8.length() as usize];
+        u8.copy_to(&mut vec[..]);
+
+        let text = String::from_utf8_lossy(&vec).to_string();
+        let timestamp = project_core::Timestamp(Date::now() as u64);
+        Ok(project_core::Message::new(
+            timestamp,
+            project_core::Direction::In,
+            text,
         ))
     }
 
     async fn write(&mut self, _message: project_core::Message) -> project_core::Result<()> {
-        // Writing requires handling WritableStream; not implemented here.
-        Err(project_core::Error::WriteError(
-            "Write not implemented for web".to_string(),
-        ))
+        use wasm_bindgen_futures::JsFuture;
+
+        let port = match &self.port {
+            Some(p) => p,
+            None => return Err(project_core::Error::WriteError("No port open".to_string())),
+        };
+
+        let port_js = JsValue::from(port.clone());
+
+        let writable = Reflect::get(&port_js, &JsValue::from_str("writable")).map_err(|_| {
+            project_core::Error::WriteError("Port has no writable stream".to_string())
+        })?;
+        if writable.is_undefined() || writable.is_null() {
+            return Err(project_core::Error::WriteError(
+                "Writable stream not available".to_string(),
+            ));
+        }
+
+        let get_writer =
+            Reflect::get(&writable, &JsValue::from_str("getWriter")).map_err(|_| {
+                project_core::Error::WriteError("Writable.getWriter not available".to_string())
+            })?;
+        if !get_writer.is_function() {
+            return Err(project_core::Error::WriteError(
+                "Writable.getWriter not available".to_string(),
+            ));
+        }
+        let get_writer_fn: Function = get_writer.unchecked_into();
+        let writer = get_writer_fn.call0(&writable).map_err(|_| {
+            project_core::Error::WriteError("Failed to call writable.getWriter".to_string())
+        })?;
+
+        // Convert message text to bytes
+        let bytes = _message.text().as_bytes();
+        let array = Uint8Array::from(bytes);
+
+        // call writer.write(array)
+        let write_fn = Reflect::get(&writer, &JsValue::from_str("write")).map_err(|_| {
+            project_core::Error::WriteError("Writer.write not available".to_string())
+        })?;
+        if !write_fn.is_function() {
+            return Err(project_core::Error::WriteError(
+                "Writer.write not a function".to_string(),
+            ));
+        }
+        let write_fn: Function = write_fn.unchecked_into();
+        let promise = write_fn
+            .call1(&writer, &JsValue::from(array))
+            .map_err(|_| {
+                project_core::Error::WriteError("Failed to call writer.write".to_string())
+            })?;
+
+        let promise = promise.dyn_into::<js_sys::Promise>().map_err(|_| {
+            project_core::Error::WriteError("writer.write did not return a Promise".to_string())
+        })?;
+
+        JsFuture::from(promise).await.map_err(|_| {
+            project_core::Error::WriteError("writer.write promise failed".to_string())
+        })?;
+
+        // Optionally release the writer lock if releaseLock exists
+        if let Ok(release_fn) = Reflect::get(&writer, &JsValue::from_str("releaseLock")) {
+            if release_fn.is_function() {
+                let rel: Function = release_fn.unchecked_into();
+                let _ = rel.call0(&writer);
+            }
+        }
+
+        Ok(())
     }
 
     fn is_open(&self) -> bool {
