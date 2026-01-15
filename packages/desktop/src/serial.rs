@@ -6,11 +6,17 @@ use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Desktop implementation of SerialPort using the serialport crate
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DesktopSerialPort {
     port: Arc<Mutex<Option<Box<dyn serialport::SerialPort>>>>,
     info: PortInfo,
     config: PortConfig,
+}
+
+impl PartialEq for DesktopSerialPort {
+    fn eq(&self, other: &Self) -> bool {
+        self.info == other.info && self.config == other.config
+    }
 }
 
 impl DesktopSerialPort {
@@ -20,12 +26,6 @@ impl DesktopSerialPort {
             info,
             config,
         }
-    }
-}
-
-impl Default for DesktopSerialPort {
-    fn default() -> Self {
-        Self::new(PortInfo::default(), PortConfig::default())
     }
 }
 
@@ -43,6 +43,10 @@ impl SerialPortConfig for DesktopSerialPort {
 
 #[async_trait(?Send)]
 impl SerialPort for DesktopSerialPort {
+    async fn request_port(info: PortInfo, config: PortConfig) -> Result<Self> {
+        Ok(DesktopSerialPort::new(info, config))
+    }
+
     async fn open(&mut self) -> Result<()> {
         let port = serialport::new(&self.info.port, self.config.baud_rate)
             .data_bits(match self.config.data_bits {

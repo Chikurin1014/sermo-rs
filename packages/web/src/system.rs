@@ -2,6 +2,7 @@ use js_sys::Date;
 
 use project_core::{TimeSource, Timestamp};
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct SystemTimeSource;
 
 impl TimeSource for SystemTimeSource {

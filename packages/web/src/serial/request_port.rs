@@ -1,5 +1,5 @@
 use dioxus::prelude::*;
-use project_core::SerialPort as _;
+use project_core::{PortConfig, SerialPort as _};
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
 use web_sys;
@@ -14,7 +14,7 @@ pub fn RequestPort() -> Element {
     // complexity while ensuring `request_port()` is exercised from the UI.
     let on_request = move |_| {
         spawn_local(async move {
-            match WebSerialPort::request_port().await {
+            match WebSerialPort::request_port(PortConfig::default()).await {
                 Ok(ws) => {
                     // Try to get info from the opened web serial object
                     let msg = format!("{}: {:?}", "Selected port".to_string(), ws.info().await);

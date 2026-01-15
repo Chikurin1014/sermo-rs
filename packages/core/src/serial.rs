@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 /// Port type information inspired by `serialport::SerialPortType`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum PortType {
     Usb {
         vendor_id: Option<u16>,
@@ -22,7 +22,7 @@ pub enum PortType {
 }
 
 /// Static information about a physical port returned by `list_ports()`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PortInfo {
     /// Port name (e.g., "COM1", "/dev/ttyUSB0")
     pub port: String,
@@ -49,7 +49,7 @@ impl Default for PortInfo {
 }
 
 /// Configuration used to open a port (baud rate, data bits, stop bits, ...)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PortConfig {
     pub baud_rate: u32,
     pub data_bits: u8,
@@ -82,7 +82,9 @@ pub trait SerialPortConfig {
 
 /// Trait for platform-agnostic serial port communication
 #[async_trait(?Send)]
-pub trait SerialPort: Default + SerialPortConfig {
+pub trait SerialPort: SerialPortConfig + Sized + PartialEq {
+    async fn request_port(info: PortInfo, config: PortConfig) -> Result<Self>;
+
     /// Open the serial port
     async fn open(&mut self) -> Result<()>;
 

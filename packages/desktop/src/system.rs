@@ -1,6 +1,7 @@
 use project_core::TimeSource;
 use project_core::Timestamp;
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct SystemTimeSource;
 
 impl TimeSource for SystemTimeSource {
