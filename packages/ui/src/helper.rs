@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 
-use project_core::Message;
+use project_core::data::Message;
 
 /// Simple renderer for message data. Return an Element so callers can embed it
 /// in `rsx!` expressions without using component props macros.
@@ -20,12 +20,12 @@ pub fn render_terminal(
         div { class: "terminal-view",
             h4 { "Terminal" }
             ul {
-                {messages.iter().map(|m| {
+                { messages.iter().map(|m: &Message| {
                     let ts_ms = u64::from(m.timestamp());
                     let ts_str = if let Some(f) = format_timestamp { f(ts_ms) } else { format!("{}", ts_ms) };
                     let label = format!("[{}] {}", ts_str, m.direction());
                     rsx!( li { span { class: "message-label", "{label}" } { crate::helper::render_data(m.text()) } } )
-                })}
+                }) }
             }
         }
     )

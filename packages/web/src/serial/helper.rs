@@ -2,7 +2,7 @@ use js_sys::{Function, Reflect};
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 
-use project_core::{PortInfo, PortType};
+use project_core::serial::{PortInfo, PortType};
 
 // Try to extract `PortInfo` from a `web_sys::SerialPort` using the
 // Web Serial `getInfo()` method when available. This is an async helper

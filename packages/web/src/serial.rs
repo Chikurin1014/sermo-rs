@@ -1,18 +1,20 @@
 mod helper;
-mod request_port;
 
 use async_trait::async_trait;
+use project_core::serial::SerialPort;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 use web_sys;
 
 use js_sys::{Date, Function, Reflect, Uint8Array};
-use project_core::{PortConfig, PortInfo, Result as CoreResult};
+use project_core::{
+    data::{Direction, Message, Timestamp},
+    serial::{PortConfig, PortInfo, SerialPortConfig},
+    Result as CoreResult,
+};
 
 use helper::js_port_to_port_info;
-
-pub use request_port::RequestPort;
 
 /// Simple WebSerial that owns an optional `web_sys::SerialPort` instance and
 /// implements the `project_core::SerialPort` trait.
@@ -165,7 +167,7 @@ impl WebSerialPort {
     }
 }
 
-impl project_core::SerialPortConfig for WebSerialPort {
+impl SerialPortConfig for WebSerialPort {
     fn with_port(mut self, port: String) -> Self {
         self.info.port = port;
         self
@@ -178,14 +180,14 @@ impl project_core::SerialPortConfig for WebSerialPort {
 }
 
 #[async_trait(?Send)]
-impl project_core::SerialPort for WebSerialPort {
+impl SerialPort for WebSerialPort {
     /// Request a port from the user and return a `WebSerialPort` owning that port.
     /// The first argument `info` will not be used, as the user selects the port.
     async fn request_port(_: PortInfo, config: PortConfig) -> CoreResult<Self> {
         Self::request_port(config).await
     }
 
-    async fn open(&mut self) -> project_core::Result<()> {
+    async fn open(&mut self) -> CoreResult<()> {
         let options = web_sys::SerialOptions::new(self.config.baud_rate);
         options.set_data_bits(self.config.data_bits);
         options.set_stop_bits(self.config.stop_bits);
@@ -198,7 +200,7 @@ impl project_core::SerialPort for WebSerialPort {
         Ok(())
     }
 
-    async fn close(&mut self) -> project_core::Result<()> {
+    async fn close(&mut self) -> CoreResult<()> {
         let promise = self.port.close();
         JsFuture::from(promise)
             .await
@@ -206,7 +208,8 @@ impl project_core::SerialPort for WebSerialPort {
         self.is_open = false;
         Ok(())
     }
-    async fn read(&mut self) -> project_core::Result<project_core::Message> {
+
+    async fn read(&mut self) -> CoreResult<Message> {
         if !self.is_open {
             return Err(project_core::Error::ReadError(
                 "Port is not open".to_string(),
@@ -214,15 +217,11 @@ impl project_core::SerialPort for WebSerialPort {
         }
         let array = self.read().await?;
         let text = String::from_utf8_lossy(&array.to_vec()).to_string();
-        let timestamp = project_core::Timestamp(Date::now() as u64);
-        Ok(project_core::Message::new(
-            timestamp,
-            project_core::Direction::In,
-            text,
-        ))
+        let timestamp = Timestamp(Date::now() as u64);
+        Ok(Message::new(timestamp, Direction::In, text))
     }
 
-    async fn write(&mut self, message: project_core::Message) -> project_core::Result<()> {
+    async fn write(&mut self, message: Message) -> CoreResult<()> {
         if !self.is_open {
             return Err(project_core::Error::WriteError(
                 "Port is not open".to_string(),
@@ -240,20 +239,20 @@ impl project_core::SerialPort for WebSerialPort {
     }
 
     /// Web Serial doesn't expose a flush primitive; noop for now.
-    async fn flush(&mut self) -> project_core::Result<()> {
+    async fn flush(&mut self) -> CoreResult<()> {
         Ok(())
     }
 
-    async fn config(&self) -> &project_core::PortConfig {
+    async fn config(&self) -> &PortConfig {
         &self.config
     }
 
-    async fn info(&self) -> &project_core::PortInfo {
+    async fn info(&self) -> &PortInfo {
         &self.info
     }
 
     /// Return the list of previously permitted ports (does not prompt the user).
-    async fn list_ports() -> project_core::Result<Vec<PortInfo>> {
+    async fn list_ports() -> CoreResult<Vec<PortInfo>> {
         let window = web_sys::window()
             .ok_or_else(|| project_core::Error::DeviceNotFound("No window object".to_string()))?;
         let navigator = window.navigator();

@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone, PartialEq)]
 pub enum Error {
     #[error("Serial port error: {0}")]
     SerialError(String),
@@ -27,7 +27,7 @@ pub enum Error {
     ConfigError(String),
 
     #[error("IO error: {0}")]
-    IoError(#[from] std::io::Error),
+    IoError(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

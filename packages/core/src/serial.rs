@@ -82,7 +82,7 @@ pub trait SerialPortConfig {
 
 /// Trait for platform-agnostic serial port communication
 #[async_trait(?Send)]
-pub trait SerialPort: SerialPortConfig + Sized + PartialEq {
+pub trait SerialPort: SerialPortConfig + Sized + PartialEq + Clone {
     async fn request_port(info: PortInfo, config: PortConfig) -> Result<Self>;
 
     /// Open the serial port
@@ -92,7 +92,7 @@ pub trait SerialPort: SerialPortConfig + Sized + PartialEq {
     async fn close(&mut self) -> Result<()>;
 
     /// Read data from the serial port
-    /// Returns the number of bytes read and the data buffer
+    /// Returns a Message
     async fn read(&mut self) -> Result<Message>;
 
     /// Write data to the serial port

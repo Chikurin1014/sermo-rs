@@ -1,6 +1,8 @@
 use async_trait::async_trait;
 use project_core::{
-    Direction, Error, Message, PortConfig, PortInfo, PortType, Result, SerialPort, SerialPortConfig,
+    data::{Direction, Message},
+    serial::{PortConfig, PortInfo, PortType, SerialPort, SerialPortConfig},
+    Error, Result,
 };
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};

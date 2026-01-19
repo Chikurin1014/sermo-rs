@@ -5,7 +5,7 @@ use dioxus::prelude::*;
 
 use ui::App;
 
-use serial::{RequestPort, WebSerialPort};
+use serial::WebSerialPort;
 use system::SystemTimeSource;
 
 const FAVICON: Asset = asset!("/assets/favicon.ico");
@@ -23,6 +23,5 @@ fn WebApp() -> Element {
         document::Link { rel: "stylesheet", href: MAIN_CSS }
 
         App::<WebSerialPort, SystemTimeSource> {}
-        RequestPort {}
     }
 }
