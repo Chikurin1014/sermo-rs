@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 dioxus = { workspace = true }
 
-project_core = { workspace = true }
+project-core = { workspace = true }
 uuid = { version = "1", features = ["serde", "v4"] }
 
 [features]

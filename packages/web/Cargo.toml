@@ -21,7 +21,7 @@ web-sys = { version = "0.3", features = [
 ] }
 uuid = { version = "1", features = ["v4", "serde", "js"] }
 
-project_core = { workspace = true }
+project-core = { workspace = true }
 ui = { workspace = true }
 
 [features]

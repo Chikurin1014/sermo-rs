@@ -8,7 +8,7 @@ dioxus = { workspace = true, features = [] }
 
 uuid = { version = "1", features = ["v4", "serde"] }
 
-project_core = { workspace = true }
+project-core = { workspace = true }
 ui = { workspace = true }
 
 serialport = "4.5"
