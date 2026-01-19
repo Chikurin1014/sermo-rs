@@ -7,6 +7,7 @@ edition = "2021"
 dioxus = { workspace = true }
 
 project_core = { workspace = true }
+uuid = { version = "1", features = ["serde", "v4"] }
 
 [features]
 default = []

@@ -19,6 +19,7 @@ web-sys = { version = "0.3", features = [
     "SerialOptions",
     "SerialPortRequestOptions",
 ] }
+uuid = { version = "1", features = ["v4", "serde", "js"] }
 
 project_core = { workspace = true }
 ui = { workspace = true }

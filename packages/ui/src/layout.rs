@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 
-use crate::components::{ConnectionBar, PortList, SettingsPanel};
+use crate::components::{ConnectionBar, PortList, RequestPort, SettingsPanel};
 
 #[allow(non_snake_case)]
 #[component]
@@ -19,6 +19,7 @@ pub fn Layout() -> Element {
             aside { class: "sidebar",
                 ConnectionBar {}
                 PortList {}
+                RequestPort {}
                 SettingsPanel {}
             }
 

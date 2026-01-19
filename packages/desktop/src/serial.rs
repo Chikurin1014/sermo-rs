@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use project_core::{
     data::{Direction, Message},
-    serial::{PortConfig, PortInfo, PortType, SerialPort, SerialPortConfig},
+    serial::{PortConfig, PortInfo, SerialPort, SerialPortConfig},
     Error, Result,
 };
 use std::sync::{Arc, Mutex};
@@ -122,42 +122,15 @@ impl SerialPort for DesktopSerialPort {
         Ok(())
     }
 
-    fn is_open(&self) -> bool {
-        self.port.lock().unwrap().is_some()
-    }
-
-    async fn config(&self) -> &PortConfig {
+    fn config(&self) -> &PortConfig {
         &self.config
     }
 
-    async fn info(&self) -> &PortInfo {
+    fn info(&self) -> &PortInfo {
         &self.info
     }
 
-    async fn list_ports() -> Result<Vec<PortInfo>> {
-        let ports =
-            serialport::available_ports().map_err(|e| Error::DeviceNotFound(e.to_string()))?;
-
-        Ok(ports
-            .into_iter()
-            .map(|p| {
-                // Map platform port type into our PortType enum when possible.
-                let port_type = match p.port_type {
-                    serialport::SerialPortType::BluetoothPort => PortType::Bluetooth,
-                    serialport::SerialPortType::PciPort => PortType::Pci,
-                    serialport::SerialPortType::UsbPort(_) => {
-                        // We don't attempt to pull out structured USB fields here to
-                        // avoid fragile platform-specific field access; store a
-                        // textual representation for now.
-                        PortType::Other(format!("{:?}", p.port_type))
-                    }
-                    _ => PortType::Other(format!("{:?}", p.port_type)),
-                };
-
-                let mut info = PortInfo::new(p.port_name.clone(), port_type);
-                info.description = None;
-                info
-            })
-            .collect())
+    fn is_open(&self) -> bool {
+        self.port.lock().unwrap().is_some()
     }
 }

@@ -43,7 +43,7 @@ impl WebSerialPort {
         })?;
 
         // Try to extract richer `PortInfo` metadata from the selected port.
-        let info = js_port_to_port_info(&port, "Selected Web Serial Port".to_string()).await;
+        let info = js_port_to_port_info(&port).await;
 
         Ok(Self {
             port,
@@ -243,40 +243,11 @@ impl SerialPort for WebSerialPort {
         Ok(())
     }
 
-    async fn config(&self) -> &PortConfig {
+    fn config(&self) -> &PortConfig {
         &self.config
     }
 
-    async fn info(&self) -> &PortInfo {
+    fn info(&self) -> &PortInfo {
         &self.info
-    }
-
-    /// Return the list of previously permitted ports (does not prompt the user).
-    async fn list_ports() -> CoreResult<Vec<PortInfo>> {
-        let window = web_sys::window()
-            .ok_or_else(|| project_core::Error::DeviceNotFound("No window object".to_string()))?;
-        let navigator = window.navigator();
-        let serial = navigator.serial();
-
-        let promise = serial.get_ports();
-
-        let infos = JsFuture::from(promise)
-            .await
-            .map_err(|_| project_core::Error::DeviceNotFound("Failed to get ports".to_string()))?
-            .dyn_into::<js_sys::Array>()
-            .map_err(|_| {
-                project_core::Error::DeviceNotFound("Failed to convert ports".to_string())
-            })?;
-        let mut result = vec![];
-        for info in infos {
-            if info.is_undefined() || info.is_null() {
-                continue;
-            }
-            if let Some(port) = info.dyn_into::<web_sys::SerialPort>().ok() {
-                let info = js_port_to_port_info(&port, "Web Serial Port".to_string()).await;
-                result.push(info);
-            }
-        }
-        Ok(result)
     }
 }
