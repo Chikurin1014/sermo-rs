@@ -38,8 +38,8 @@ pub fn App<S: SerialPort + 'static, T: TimeSource + 'static>() -> Element {
                         return;
                     }
                 };
-                let info = port.info();
-                ports.write().insert(info.id, port);
+                let id = Uuid::new_v4();
+                ports.write().insert(id, port);
                 res.set(Some(Ok(())))
             }
         });

@@ -1,6 +1,5 @@
 use dioxus::logger::tracing::warn;
 use js_sys::{Function, Reflect};
-use uuid::Uuid;
 use wasm_bindgen::{JsCast, JsValue};
 
 use project_core::serial::{PortInfo, PortType};
@@ -35,8 +34,7 @@ pub async fn js_port_to_port_info(port: &web_sys::SerialPort) -> PortInfo {
         .ok()
         .and_then(|v| v.as_f64().map(|n| n as u16));
 
-    PortInfo::with_id(
-        Uuid::new_v4(),
+    PortInfo::new(
         "WebSerial Device".to_string(),
         PortType::WebSerial {
             vendor_id,
